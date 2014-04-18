@@ -4,11 +4,13 @@ PRJ=startDest.exe
 
 CC=gcc
 CFLAGS= -Wall -std=c99 -m32
+CXX=g++
+CXXFLAGS= -Wall -m32
 
 all: $(PRJ)
 
 $(PRJ): $(OBJ)
-	gcc $(CFLAGS) -o $@ $<
+	g++ $(CFLAGS) -o $@ $<
 
 clean:
 	del $(OBJ) $(PRJ)
