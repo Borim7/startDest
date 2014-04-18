@@ -24,7 +24,7 @@ BOOL CALLBACK enumWindowCallback(HWND hwnd, LPARAM target) {
 	// get pid for current window
 	GetWindowThreadProcessId(hwnd, &windowPid);
 	
-	printf("check, window pid: %u, search for: %u\n", (unsigned int)windowPid, (unsigned int)info->pid);
+	//printf("check, window pid: %u, search for: %u\n", (unsigned int)windowPid, (unsigned int)info->pid);
 	
 	if(windowPid == info->pid){
 		// found desired window
@@ -77,18 +77,20 @@ int main(int argc, char** argv) {
 	int xCoord = -1;
 	int yCoord = -1;
 	int verbose = 0;
+	int timeout = 5;
 	int opt;
 	
 	if(argc == 1) {
 		printf("Usage: %s <options> <gui program>\n", argv[0]);
 		printf("-x <num>  x coordinate of the program window\n");
 		printf("-y <num>  y coordinate of the program window\n");
+		printf("-t <sec>  how many seconds to wait for the program to start\n");
 		printf("-v        print debug information\n");
 		exit(-1);
 	}
 	
 	// parse command line
-	while((opt = getopt (argc, argv, "vx:y:")) != -1) {
+	while((opt = getopt (argc, argv, "vx:y:t:")) != -1) {
 		switch(opt){
 		case 'x':
 			xCoord = atoi(optarg);
@@ -96,6 +98,10 @@ int main(int argc, char** argv) {
 			
 		case 'y':
 			yCoord = atoi(optarg);
+			break;
+		
+		case 't':
+			timeout = atoi(optarg);
 			break;
 		
 		case 'v':
@@ -145,7 +151,7 @@ int main(int argc, char** argv) {
 	// search for window handle
 	HWND hwnd = 0;
 	int i = 0;
-	for(i = 0; i < 5; i++){
+	for(i = 0; i < timeout; i++){
 		hwnd = searchWindow(processInfo.dwProcessId);
 		// check if window was found
 		if(hwnd != 0){
