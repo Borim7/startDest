@@ -1,17 +1,21 @@
 #include <windows.h>
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdlib>
 #include <unistd.h>
+#include <iostream>
+#include <vector>
 
-// ********** search HWND ***************
+using namespace std;
 
 /// target process struct
 typedef struct{
 	DWORD pid;
+	DWORD tid;
 	HWND hwnd;
 } targetInfo;
 
+
+// ********** search Window ***************
 /**
  * \brief Callback for searching through windows.
  * \param target pointer to target process struct.
@@ -38,6 +42,7 @@ BOOL CALLBACK enumWindowCallback(HWND hwnd, LPARAM target) {
 
 /**
  * \brief determine the window handle for the passed process id.
+ * Does not work for process with single instance option.
  * \retval 0 no window with matchin pid found.
  */
 HWND searchWindow(DWORD pid){
@@ -48,6 +53,84 @@ HWND searchWindow(DWORD pid){
 	EnumWindows(enumWindowCallback, (LPARAM)&info);
 	
 	return info.hwnd;
+}
+
+// ***************** scan window ********************
+BOOL CALLBACK scanWindowCallback(HWND hwnd, LPARAM infoVector) {
+	DWORD windowPid = 0;
+	DWORD windowTid = 0;
+	vector<targetInfo>* infoVec = (vector<targetInfo>*) infoVector;
+	targetInfo info;
+	
+	// get pid and tid for current window
+	windowTid = GetWindowThreadProcessId(hwnd, &windowPid);
+	
+	// add new value to vector
+	info.pid = windowPid;
+	info.tid = windowTid;
+	info.hwnd = hwnd;
+	infoVec->push_back(info);
+	
+	// continue iteration
+	return TRUE;
+}
+
+/**
+ * @brief add all currently existing windows to the info list.
+ * @param infos the window info list.
+ */
+void fillCurrentWindows(vector<targetInfo>* infos){
+	// walk over all existing windows
+	EnumWindows(scanWindowCallback, (LPARAM)infos);
+}
+
+
+// ************ find new window *****************
+
+typedef struct {
+	vector<targetInfo>* knownWindows;
+	HWND newWindow;
+} NewWindowInfo;
+
+
+BOOL CALLBACK newWindowCallback(HWND hwnd, LPARAM newInfoVector) {
+	DWORD windowPid = 0;
+	DWORD windowTid = 0;
+	NewWindowInfo* newInfo = (NewWindowInfo*) newInfoVector;
+	
+	// get pid and tid for current window
+	windowTid = GetWindowThreadProcessId(hwnd, &windowPid);
+	
+	// check if windows is already known
+	for(targetInfo info : *(newInfo->knownWindows) ) {
+		if( (info.pid == windowPid) && (info.tid == windowTid) ) {
+			// window already known
+			continue;
+		}
+		
+		// else new window
+		newInfo->newWindow = hwnd;
+		// stop search
+		return FALSE;
+	}
+	
+	// continue search
+	return TRUE;
+}
+
+
+/**
+ * @brief Find the new window that is not in the window list.
+ */
+HWND findNewWindow(vector<targetInfo>* infos) {
+	NewWindowInfo newInfo;
+	newInfo.knownWindows = infos;
+	newInfo.newWindow = 0;
+	
+	// walk over all existing windows
+	EnumWindows(scanWindowCallback, (LPARAM)&newInfo);
+	
+	return newInfo.newWindow;
 }
 
 // *********** move window *********************
@@ -80,12 +163,15 @@ int main(int argc, char** argv) {
 	int timeout = 5;
 	int opt;
 	
+	vector<targetInfo> windowList;
+	
+	
 	if(argc == 1) {
-		printf("Usage: %s <options> <gui program>\n", argv[0]);
-		printf("-x <num>  x coordinate of the program window\n");
-		printf("-y <num>  y coordinate of the program window\n");
-		printf("-t <sec>  how many seconds to wait for the program to start\n");
-		printf("-v        print debug information\n");
+		cout << "Usage: " << argv[0] << " <options> <gui program>\n"
+			<< "-x <num>  x coordinate of the program window\n"
+			<< "-y <num>  y coordinate of the program window\n"
+			<< "-t <sec>  how many seconds to wait for the program to start\n"
+			<< "-v        print debug information" << endl;
 		exit(-1);
 	}
 	
@@ -109,7 +195,7 @@ int main(int argc, char** argv) {
 			break;
 		
 		default:
-			printf("Invalid option: %c\n", opt);
+			cout << "Invalid option: " << (char)opt << endl;
 			exit(-1);
 		}
 	}
@@ -122,12 +208,16 @@ int main(int argc, char** argv) {
 		SearchPath(NULL, argv[optind], NULL, sizeof(programPath), programPath, fileName);
 		
 		if(verbose){
-			printf("start %s\n", programPath);
+			cout << "start " << programPath << endl;
 		}
 	} else {
-		printf("No program to start given\n");
+		cout << "No program to start given" << endl;
 		exit(-1);
 	}
+	
+	// scan all current windows and remember them
+	fillCurrentWindows(&windowList);
+	cout << "Found " << windowList.size() << " window threads" << endl;
 	
 	// prepare info variables
 	STARTUPINFO startInfo;
@@ -144,7 +234,7 @@ int main(int argc, char** argv) {
 		&startInfo, &processInfo);
 	
 	if(!success){
-		printf("Can not start program\n");
+		cout << "Can not start program" << endl;
 		exit(-1);
 	}
 	
@@ -152,7 +242,9 @@ int main(int argc, char** argv) {
 	HWND hwnd = 0;
 	int i = 0;
 	for(i = 0; i < timeout; i++){
-		hwnd = searchWindow(processInfo.dwProcessId);
+		// simple search after process id does not work for single instance programs
+		//hwnd = searchWindow(processInfo.dwProcessId);
+		hwnd = findNewWindow(&windowList);
 		// check if window was found
 		if(hwnd != 0){
 			// success
@@ -164,7 +256,7 @@ int main(int argc, char** argv) {
 	}
 	
 	if(verbose) {
-		printf("search runs: %i, found: %i\n", i, hwnd != 0);
+		cout << "search runs: " << i << ", found: " << (hwnd != 0) << endl;
 	}
 	
 	return 0;

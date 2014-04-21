@@ -2,15 +2,13 @@ SRC= startDest.c
 OBJ=$(SRC:.c=.o)
 PRJ=startDest.exe
 
-CC=gcc
-CFLAGS= -Wall -std=c99 -m32
 CXX=g++
-CXXFLAGS= -Wall -m32
+CXXFLAGS= -g -m32 -Wall -std=c++0x
 
 all: $(PRJ)
 
 $(PRJ): $(OBJ)
-	g++ $(CFLAGS) -o $@ $<
+	g++ -o $@ $< $(CXXFLAGS)
 
 clean:
 	del $(OBJ) $(PRJ)
