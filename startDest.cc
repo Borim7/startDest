@@ -128,7 +128,7 @@ HWND findNewWindow(vector<targetInfo>* infos) {
 	newInfo.newWindow = 0;
 	
 	// walk over all existing windows
-	EnumWindows(scanWindowCallback, (LPARAM)&newInfo);
+	EnumWindows(newWindowCallback, (LPARAM)&newInfo);
 	
 	return newInfo.newWindow;
 }
