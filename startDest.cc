@@ -15,6 +15,35 @@ typedef struct{
 } targetInfo;
 
 
+// verbosity flag
+int verbose = 0;
+
+// ********** print debug info **************
+void printWindowInfo(string message, HWND hwnd) {
+	DWORD windowPid = 0;
+	DWORD windowTid = 0;
+	
+	// get pid and tid for current window
+	windowTid = GetWindowThreadProcessId(hwnd, &windowPid);
+	// get window state information
+	WINDOWINFO windowInfo;
+	windowInfo.cbSize = sizeof(WINDOWINFO);
+	
+	GetWindowInfo(hwnd, &windowInfo);
+	
+	// extract flags
+	int visible = (windowInfo.dwStyle & WS_VISIBLE) > 0;
+	int disabled = (windowInfo.dwStyle & WS_DISABLED) > 0;
+	int popup = (windowInfo.dwStyle & WS_POPUP) > 0;
+	int sibling = (windowInfo.dwStyle & WS_CLIPSIBLINGS) > 0;
+	
+	cout << message << ", pid: " << windowPid << ", tid: " << windowTid
+		<< ", hwnd: " << hwnd << ", state: " << hex << windowInfo.dwStyle
+		<< ", visible: " << visible
+		<< ", disabled: " << disabled << ", popup: " << popup 
+		<< ", sibling: " << sibling << dec << endl;
+}
+
 // ********** search Window ***************
 /**
  * \brief Callback for searching through windows.
@@ -96,6 +125,7 @@ typedef struct {
 BOOL CALLBACK newWindowCallback(HWND hwnd, LPARAM newInfoVector) {
 	DWORD windowPid = 0;
 	DWORD windowTid = 0;
+	bool isKnown = false;
 	NewWindowInfo* newInfo = (NewWindowInfo*) newInfoVector;
 	
 	// get pid and tid for current window
@@ -105,15 +135,30 @@ BOOL CALLBACK newWindowCallback(HWND hwnd, LPARAM newInfoVector) {
 	for(targetInfo info : *(newInfo->knownWindows) ) {
 		if( (info.pid == windowPid) && (info.tid == windowTid) ) {
 			// window already known
-			continue;
+			isKnown = true;
+			break;
+		}
+	}
+
+	// add new windows to list
+	if(!isKnown){	
+		if(verbose) {
+			printWindowInfo("New Window", hwnd);
 		}
 		
-		// else new window
-		newInfo->newWindow = hwnd;
-		// stop search
-		return FALSE;
+		// get window state
+		// get window state information
+		WINDOWINFO windowInfo;
+		windowInfo.cbSize = sizeof(WINDOWINFO);		
+		GetWindowInfo(hwnd, &windowInfo);
+		// extract flags
+		int isVisible = (windowInfo.dwStyle & WS_VISIBLE) > 0;
+		
+		// only consider visible windows
+		if(isVisible){
+			newInfo->newWindow = hwnd;
+		}
 	}
-	
 	// continue search
 	return TRUE;
 }
@@ -159,7 +204,6 @@ int main(int argc, char** argv) {
 	char programPath[4096];
 	int xCoord = -1;
 	int yCoord = -1;
-	int verbose = 0;
 	int timeout = 5;
 	int opt;
 	
