@@ -142,7 +142,7 @@ BOOL CALLBACK newWindowCallback(HWND hwnd, LPARAM newInfoVector) {
 
 	// add new windows to list
 	if(!isKnown){	
-		if(verbose) {
+		if(verbose > 1) {
 			printWindowInfo("New Window", hwnd);
 		}
 		
@@ -202,6 +202,7 @@ void moveit(HWND hwnd, int x, int y) {
 
 int main(int argc, char** argv) {
 	char programPath[4096];
+	char programArgs[4096];
 	int xCoord = -1;
 	int yCoord = -1;
 	int timeout = 5;
@@ -215,12 +216,12 @@ int main(int argc, char** argv) {
 			<< "-x <num>  x coordinate of the program window\n"
 			<< "-y <num>  y coordinate of the program window\n"
 			<< "-t <sec>  how many seconds to wait for the program to start\n"
-			<< "-v        print debug information" << endl;
+			<< "-v <lvl>  print debug information, optional level" << endl;
 		exit(-1);
 	}
 	
 	// parse command line
-	while((opt = getopt (argc, argv, "vx:y:t:")) != -1) {
+	while((opt = getopt (argc, argv, "v::x:y:t:")) != -1) {
 		switch(opt){
 		case 'x':
 			xCoord = atoi(optarg);
@@ -235,7 +236,10 @@ int main(int argc, char** argv) {
 			break;
 		
 		case 'v':
-			verbose = 1;
+			verbose = atoi(optarg);
+			if(!verbose){
+				verbose = 1;
+			}
 			break;
 		
 		default:
@@ -251,8 +255,22 @@ int main(int argc, char** argv) {
 		// search PATH for the program
 		SearchPath(NULL, argv[optind], NULL, sizeof(programPath), programPath, fileName);
 		
+		// build command line
+		if(optind + 1 < argc) {
+			string tempStr(programPath);
+			tempStr += " ";
+			
+			for(int i = optind + 1; i < argc; i++) {
+				tempStr += argv[i];
+				tempStr += " ";
+			}
+			
+			int len = tempStr.copy(programArgs, sizeof(programArgs));
+			programArgs[len] = 0;
+		}
+		
 		if(verbose){
-			cout << "start " << programPath << endl;
+			cout << "start " << programPath << " " << programArgs << endl;
 		}
 	} else {
 		cout << "No program to start given" << endl;
@@ -261,7 +279,9 @@ int main(int argc, char** argv) {
 	
 	// scan all current windows and remember them
 	fillCurrentWindows(&windowList);
-	cout << "Found " << windowList.size() << " window threads" << endl;
+	if(verbose) {
+		cout << "Found " << windowList.size() << " window threads" << endl;
+	}
 	
 	// prepare info variables
 	STARTUPINFO startInfo;
@@ -271,7 +291,7 @@ int main(int argc, char** argv) {
     ZeroMemory( &processInfo, sizeof(processInfo) );
 	
 	// start the program
-	BOOL success = CreateProcess(programPath, NULL,
+	BOOL success = CreateProcess(programPath, programArgs,
 		NULL, NULL, // security attributes
 		FALSE, 0, // no handle inherited, use standard priority
 		NULL, NULL, // no specific environment and work dir
