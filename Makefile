@@ -3,7 +3,7 @@ OBJ=$(SRC:.c=.o)
 PRJ=startDest.exe
 
 CXX=g++
-CXXFLAGS= -g -m32 -Wall -std=c++0x
+CXXFLAGS= -g -Wall -std=c++11
 LDFLAGS= -mwindows
 
 all: $(PRJ)
@@ -12,4 +12,4 @@ $(PRJ): $(OBJ)
 	g++ -o $@ $< $(CXXFLAGS)
 
 clean:
-	del $(OBJ) $(PRJ)
+	rm -f $(OBJ) $(PRJ)
