@@ -4,6 +4,7 @@ PRJ=startDest.exe
 
 CXX=g++
 CXXFLAGS= -g -m32 -Wall -std=c++0x
+LDFLAGS= -mwindows
 
 all: $(PRJ)
 

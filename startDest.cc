@@ -197,10 +197,45 @@ void moveit(HWND hwnd, int x, int y) {
 	SetWindowPos(hwnd, HWND_TOP, x, y, 0,0, SWP_NOSIZE);
 }
 
+// helper fetching command line for gui programs
+void fetchCmdArgs(int* argc, char*** argv) {
+	// init results
+	*argc = 0;
+	
+	// prepare extraction
+	char* winCmd = GetCommandLine();
+	int index = 0;
+	bool newOption = true;
+	// use static so converted command line can be
+	// accessed from outside this function
+	static vector<char*> argVector;
+	
+	// walk over the command line and convert it to argv
+	while(winCmd[index] != 0){
+		if (winCmd[index] == ' ') {
+			// terminate option string
+			winCmd[index] = 0;
+			newOption = true;
+			
+		} else  {
+			if(newOption){
+				argVector.push_back(&winCmd[index]);
+				(*argc)++;	
+			}
+			newOption = false;
+		}
+		index++;
+	}
+	
+	// elements inside the vector are guaranteed to be continous
+	*argv = &argVector[0];
+}
 
 // ************ main ***********************
 
-int main(int argc, char** argv) {
+//int main(int argc, char** argv) {
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                   PSTR szCmdLine, int iCmdShow){
 	char programPath[4096];
 	char programArgs[4096];
 	int xCoord = -1;
@@ -210,6 +245,10 @@ int main(int argc, char** argv) {
 	
 	vector<targetInfo> windowList;
 	
+	// convert gui prog command line to argc, argv
+	int argc = 0;
+	char**  argv;
+	fetchCmdArgs(&argc, &argv);
 	
 	if(argc == 1) {
 		cout << "Usage: " << argv[0] << " <options> <gui program>\n"
