@@ -1,5 +1,5 @@
-SRC= startDest.c
-OBJ=$(SRC:.c=.o)
+SRC= startDest.cc helper.cc
+OBJ=$(SRC:.cc=.o)
 PRJ=startDest.exe
 
 CXX=g++
@@ -9,7 +9,7 @@ LDFLAGS= -mwindows
 all: $(PRJ)
 
 $(PRJ): $(OBJ)
-	g++ -o $@ $< $(CXXFLAGS)
+	g++ -o $@ $+ $(CXXFLAGS) $(LDFLAGS)
 
 clean:
 	rm -f $(OBJ) $(PRJ)

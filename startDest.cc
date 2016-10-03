@@ -1,9 +1,15 @@
+// require Windows Vista or higher (needed for QueryFullProcessImageName)
+#define _WIN32_WINNT 0x600
+
 #include <windows.h>
 
 #include <cstdlib>
+#include <cstring>
 #include <unistd.h>
 #include <iostream>
 #include <vector>
+
+#include "helper.h"
 
 using namespace std;
 
@@ -17,6 +23,8 @@ typedef struct{
 
 // verbosity flag
 int verbose = 0;
+
+const size_t MAX_PATH_SIZE = 4096;
 
 // ********** print debug info **************
 void printWindowInfo(string message, HWND hwnd) {
@@ -119,6 +127,7 @@ void fillCurrentWindows(vector<targetInfo>* infos){
 typedef struct {
 	vector<targetInfo>* knownWindows;
 	HWND newWindow;
+	const char* programPath;
 } NewWindowInfo;
 
 
@@ -156,7 +165,34 @@ BOOL CALLBACK newWindowCallback(HWND hwnd, LPARAM newInfoVector) {
 		
 		// only consider visible windows
 		if(isVisible){
-			newInfo->newWindow = hwnd;
+			char processName[MAX_PATH_SIZE];
+			
+			// check if the program name matches with the started one.
+			// (PID and TID are not reliable as the gui window can be
+			// created by another process than the started one, e.g. done by explorer.exe)
+			
+			DWORD nameLen = sizeof(processName);
+			
+			// open handle to process, query name and close handle
+			HANDLE processHandle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, windowPid);
+			BOOL success = QueryFullProcessImageName(processHandle, 0, processName, &nameLen);
+			CloseHandle(processHandle);
+			
+			if(success) {
+				// process name successful fetched
+				if(verbose) {
+					cout << "Process name of the new window: " << processName << endl;
+				}
+				
+				// use windows only if process names matches.
+				// (winAPI return pathes sometime as is or all lowercase 
+				// -> caseinsensitive compare required)
+				if( imatch(newInfo->programPath, processName) ) {
+					newInfo->newWindow = hwnd;
+				}
+				// else: process names does not match
+			}
+			// else: process name not accessible, root program? do not touch
 		}
 	}
 	// continue search
@@ -167,10 +203,11 @@ BOOL CALLBACK newWindowCallback(HWND hwnd, LPARAM newInfoVector) {
 /**
  * @brief Find the new window that is not in the window list.
  */
-HWND findNewWindow(vector<targetInfo>* infos) {
+HWND findNewWindow(vector<targetInfo>* infos, const char* programPath) {
 	NewWindowInfo newInfo;
 	newInfo.knownWindows = infos;
 	newInfo.newWindow = 0;
+	newInfo.programPath = programPath;
 	
 	// walk over all existing windows
 	EnumWindows(newWindowCallback, (LPARAM)&newInfo);
@@ -236,8 +273,8 @@ void fetchCmdArgs(int* argc, char*** argv) {
 //int main(int argc, char** argv) {
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                    PSTR szCmdLine, int iCmdShow){
-	char programPath[4096];
-	char programArgs[4096];
+	char programPath[MAX_PATH_SIZE];
+	char programArgs[MAX_PATH_SIZE];
 	int xCoord = -1;
 	int yCoord = -1;
 	int timeout = 5;
@@ -347,7 +384,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	for(i = 0; i < timeout; i++){
 		// simple search after process id does not work for single instance programs
 		//hwnd = searchWindow(processInfo.dwProcessId);
-		hwnd = findNewWindow(&windowList);
+		hwnd = findNewWindow(&windowList, programPath);
 		// check if window was found
 		if(hwnd != 0){
 			// success
